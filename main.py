@@ -4,6 +4,7 @@ import os
 import json
 import tempfile
 import shutil
+import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -79,11 +80,14 @@ class MusicPlayer:
         
         channel = self.ctx.author.voice.channel
         
+        # Небольшая задержка для стабильности
+        await asyncio.sleep(0.5)
+        
         if self.ctx.voice_client:
             self.voice_client = self.ctx.voice_client
             await self.voice_client.move_to(channel)
         else:
-            self.voice_client = await channel.connect()
+            self.voice_client = await channel.connect(timeout=10.0, reconnect=True)
         
         return True
     
@@ -302,42 +306,55 @@ class VKMusicSearch:
     def __init__(self):
         self.vk_session = vk_api.VkApi(token=VK_TOKEN)
         self.vk = self.vk_session.get_api()
-        self.vk_audio = VkAudio(self.vk_session)
     
     async def search_track(self, query: str) -> Optional[Track]:
-        """Поиск одного трека"""
+        """Поиск одного трека через прямой запрос к API"""
         try:
-            # Используем официальный метод audio.search через vk_api
-            audio_list = self.vk_audio.search(q=query, count=1)
+            # Прямой вызов API
+            result = self.vk.audio.search(q=query, count=1)
+            
+            # Проверяем структуру ответа
+            if isinstance(result, dict) and 'items' in result:
+                audio_list = result['items']
+            elif isinstance(result, list):
+                audio_list = result
+            else:
+                return None
             
             if not audio_list:
                 return None
             
             audio = audio_list[0]
-            track = Track(
-                title=audio['title'],
-                url=audio['url'],
-                duration=audio['duration'],
-                artist=audio['artist']
+            return Track(
+                title=audio.get('title', 'Неизвестно'),
+                url=audio.get('url', ''),
+                duration=audio.get('duration', 0),
+                artist=audio.get('artist', 'Неизвестен')
             )
-            return track
             
         except Exception as e:
             logger.error(f"Ошибка поиска трека: {e}")
             return None
     
     async def search_playlist(self, query: str, count: int = 5) -> List[Track]:
-        """Поиск нескольких треков (имитация плейлиста)"""
+        """Поиск нескольких треков"""
         tracks = []
         try:
-            audio_list = self.vk_audio.search(q=query, count=count)
+            result = self.vk.audio.search(q=query, count=count)
+            
+            if isinstance(result, dict) and 'items' in result:
+                audio_list = result['items']
+            elif isinstance(result, list):
+                audio_list = result
+            else:
+                return []
             
             for audio in audio_list:
                 track = Track(
-                    title=audio['title'],
-                    url=audio['url'],
-                    duration=audio['duration'],
-                    artist=audio['artist']
+                    title=audio.get('title', 'Неизвестно'),
+                    url=audio.get('url', ''),
+                    duration=audio.get('duration', 0),
+                    artist=audio.get('artist', 'Неизвестен')
                 )
                 tracks.append(track)
             
