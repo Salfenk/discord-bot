@@ -4,6 +4,10 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     build-essential \
+    python3-dev \
+    libffi-dev \
+    libnacl-dev \
+    libsodium-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Установка рабочей директории
